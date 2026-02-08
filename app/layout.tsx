@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hello World",
-  description: "A simple Next.js app with light/dark mode",
+  title: "Word Cloud",
+  description: "Word cloud from captions",
 };
 
 export default function RootLayout({
