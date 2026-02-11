@@ -238,7 +238,10 @@ export default function Home() {
           </span>
         ))}
       </div>
-      <a href="/captions" style={styles.captionsButton}>See all captions</a>
+      <div style={{ display: "flex", gap: "1rem", marginTop: "2rem", flexWrap: "wrap", justifyContent: "center" }}>
+        <a href="/captions" style={styles.captionsButton}>See all captions</a>
+        <a href="/auth/logout" style={styles.signOutLink}>Sign out</a>
+      </div>
     </main>
   );
 }
@@ -294,7 +297,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   captionsButton: {
     display: "inline-block",
-    marginTop: "2rem",
     padding: "0.6rem 1.25rem",
     fontSize: "0.95rem",
     fontWeight: 600,
@@ -304,5 +306,12 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "8px",
     textDecoration: "none",
     cursor: "pointer",
+  },
+  signOutLink: {
+    display: "inline-block",
+    padding: "0.6rem 1.25rem",
+    fontSize: "0.95rem",
+    color: "#666",
+    textDecoration: "none",
   },
 };
