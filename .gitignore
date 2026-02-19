@@ -16,6 +16,9 @@ dist
 .env.local
 .env.*.local
 
+# Docs (decision log — local only)
+docs/DECISIONS_AND_CHANGELOG.md
+
 # Misc
 .DS_Store
 *.pem

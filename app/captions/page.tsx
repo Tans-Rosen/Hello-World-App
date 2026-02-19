@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 type CaptionRow = {
   id?: number;
@@ -14,6 +14,11 @@ export default function CaptionsPage() {
   const [rows, setRows] = useState<CaptionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [votingCaptionId, setVotingCaptionId] = useState<number | null>(null);
+  const [voteError, setVoteError] = useState<string | null>(null);
+  const [votesByCaption, setVotesByCaption] = useState<Record<number, 1 | -1>>({});
+
+  const supabase = useMemo(() => createClient(), []);
 
   const fetchCaptions = useCallback(async () => {
     setError(null);
@@ -45,11 +50,64 @@ export default function CaptionsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     fetchCaptions();
   }, [fetchCaptions]);
+
+  const handleVote = useCallback(
+    async (captionId: number, voteValue: 1 | -1) => {
+      setVoteError(null);
+      setVotingCaptionId(captionId);
+      try {
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          setVoteError(sessionError.message);
+          return;
+        }
+        if (!session?.user) {
+          setVoteError("You must be signed in to vote.");
+          return;
+        }
+
+        const userId = session.user.id;
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", userId)
+          .maybeSingle();
+
+        if (profileError) {
+          setVoteError(profileError.message);
+          return;
+        }
+        const profileId = profile?.id ?? userId;
+
+        const { error: insertError } = await supabase.from("caption_votes").insert({
+          caption_id: captionId,
+          profile_id: profileId,
+          vote_value: voteValue,
+          created_datetime_utc: new Date().toISOString(),
+        });
+
+        if (insertError) {
+          setVoteError(insertError.message);
+        } else {
+          setVotesByCaption((prev) => ({ ...prev, [captionId]: voteValue }));
+        }
+      } catch (e) {
+        setVoteError(e instanceof Error ? e.message : "Failed to submit vote");
+      } finally {
+        setVotingCaptionId(null);
+      }
+    },
+    [supabase]
+  );
 
   return (
     <main style={styles.main}>
@@ -58,21 +116,59 @@ export default function CaptionsPage() {
 
       {loading && <p style={styles.message}>Loading captions…</p>}
       {error && <p style={styles.error}>{error}</p>}
+      {voteError && <p style={styles.error}>{voteError}</p>}
       {!loading && !error && rows.length === 0 && (
         <p style={styles.message}>No captions found.</p>
       )}
       {!error && rows.length > 0 && (
         <ul style={styles.list}>
-          {rows.map((row, i) => (
-            <li key={row.id ?? i} style={styles.card}>
-              <span style={styles.content}>{row.content}</span>
-              {row.created_at && (
-                <span style={styles.meta}>
-                  {new Date(row.created_at).toLocaleString()}
-                </span>
-              )}
-            </li>
-          ))}
+          {rows.map((row, i) => {
+            const voted = row.id != null && votesByCaption[row.id] != null;
+            const voteValue = row.id != null ? votesByCaption[row.id] : null;
+            const cardStyle: React.CSSProperties = voted
+              ? { ...styles.card, ...styles.cardVoted }
+              : styles.card;
+            return (
+              <li key={row.id ?? i} style={cardStyle}>
+                <span style={styles.content}>{row.content}</span>
+                {row.created_at && (
+                  <span style={styles.meta}>
+                    {new Date(row.created_at).toLocaleString()}
+                  </span>
+                )}
+                {row.id != null && (
+                  <div style={styles.voteRow}>
+                    <button
+                      type="button"
+                      style={
+                        voteValue === 1
+                          ? { ...styles.voteButton, ...styles.voteButtonUpvoted }
+                          : styles.voteButton
+                      }
+                      onClick={() => handleVote(row.id!, 1)}
+                      disabled={votingCaptionId === row.id || voted}
+                      aria-label="Upvote"
+                    >
+                      ↑ Upvote
+                    </button>
+                    <button
+                      type="button"
+                      style={
+                        voteValue === -1
+                          ? { ...styles.voteButton, ...styles.voteButtonDownvoted }
+                          : styles.voteButton
+                      }
+                      onClick={() => handleVote(row.id!, -1)}
+                      disabled={votingCaptionId === row.id || voted}
+                      aria-label="Downvote"
+                    >
+                      ↓ Downvote
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -131,6 +227,11 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     gap: "0.35rem",
   },
+  cardVoted: {
+    backgroundColor: "#e0e0e0",
+    opacity: 0.85,
+    borderColor: "#ddd",
+  },
   content: {
     fontSize: "1rem",
     lineHeight: 1.4,
@@ -138,6 +239,31 @@ const styles: Record<string, React.CSSProperties> = {
   meta: {
     fontSize: "0.8rem",
     color: "#666",
+  },
+  voteRow: {
+    display: "flex",
+    gap: "0.5rem",
+    marginTop: "0.5rem",
+  },
+  voteButton: {
+    padding: "0.35rem 0.65rem",
+    fontSize: "0.8rem",
+    fontWeight: 600,
+    color: "#333",
+    backgroundColor: "#e8e8e8",
+    border: "1px solid #ccc",
+    borderRadius: "6px",
+    cursor: "pointer",
+  },
+  voteButtonUpvoted: {
+    backgroundColor: "#2d8a3e",
+    color: "#fff",
+    borderColor: "#247a32",
+  },
+  voteButtonDownvoted: {
+    backgroundColor: "#c23030",
+    color: "#fff",
+    borderColor: "#a02828",
   },
   nav: {
     marginTop: "2rem",

@@ -1,0 +1,25 @@
+---
+description: Decisions and changelog must be read before edits and updated after any code changes
+alwaysApply: true
+---
+
+# Decisions and Changelog Rule
+
+## Before Editing
+- **Read** `docs/DECISIONS_AND_CHANGELOG.md` first.
+- **Summarize** relevant invariants from that document for the change you are planning.
+- **Check** proposed changes against the invariants — do not break them.
+- If **uncertain**, ask for clarification before changing behavior.
+
+## After Editing
+- **Update** `docs/DECISIONS_AND_CHANGELOG.md` in the same commit/patch.
+- **Add** a new Change Log entry with:
+  - date (YYYY-MM-DD)
+  - summary
+  - files changed
+  - behavior impact
+  - any follow-up needed
+- If you add or update an invariant, mark it as **NEW** or **UPDATED** in the doc.
+
+## Scope
+This applies to any code change. The doc is the source of truth for implementation decisions and must stay in sync with the codebase.
